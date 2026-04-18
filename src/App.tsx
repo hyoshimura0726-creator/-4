@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   UserPlus, Calendar, BrainCircuit, Trash2, X, Plus, 
   Sparkles, Activity, Tag, User, MessageCircleHeart, Send, Menu,
-  Briefcase, Coffee, Home, UserCircle, Download, Upload, PlayCircle, Archive, Battery, Zap
+  Briefcase, Coffee, Home, UserCircle, Download, Upload, PlayCircle, Archive, Battery, Zap, Mic
 } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -13,10 +13,10 @@ const CHAT_STORAGE_KEY = 'relationship_keeper_chat_v1';
 const ROLEPLAY_STORAGE_KEY = 'relationship_keeper_roleplay_v1';
 
 const RELATIONSHIP_TEMPLATES = [
-  { label: '白紙から作成', icon: UserCircle, relationship: '', traits: [], expectation: 3 },
-  { label: '職場の関係', icon: Briefcase, relationship: '職場の同僚/上司', traits: ['仕事優先', '報告が遅い', '完璧主義'], expectation: 3 },
-  { label: '友人・知人', icon: Coffee, relationship: '友人', traits: ['ノリが良い', '時間にルーズ', '相談に乗ってくれる'], expectation: 4 },
-  { label: '家族・親族', icon: Home, relationship: '家族', traits: ['世話焼き', '過干渉', '話を聞かない'], expectation: 5 },
+  { label: '白紙から作成', icon: UserCircle, relationship: '', traits: [], expectation: 3, category: 'その他' as const },
+  { label: '職場の関係', icon: Briefcase, relationship: '職場の同僚/上司', traits: ['仕事優先', '報告が遅い', '完璧主義'], expectation: 3, category: '仕事' as const },
+  { label: '友人・知人', icon: Coffee, relationship: '友人', traits: ['ノリが良い', '時間にルーズ', '相談に乗ってくれる'], expectation: 4, category: '友人' as const },
+  { label: '家族・親族', icon: Home, relationship: '家族', traits: ['世話焼き', '過干渉', '話を聞かない'], expectation: 5, category: '家族' as const },
 ];
 
 type Episode = {
@@ -24,12 +24,16 @@ type Episode = {
   date: string;
   description: string;
   energyDelta?: number;
+  impression?: string; // e.g. "😊 良い"
 };
+
+type Category = '仕事' | '友人' | '家族' | 'その他';
 
 type Person = {
   id: string;
   name: string;
   relationship: string;
+  category?: Category;
   expectationLevel: number; // 1 to 5
   traits: string[];
   episodes: Episode[];
@@ -53,6 +57,7 @@ export default function App() {
   });
   
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<'すべて' | Category>('すべて');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSuggestingTags, setIsSuggestingTags] = useState(false);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
@@ -96,6 +101,111 @@ export default function App() {
   const [roleplayInput, setRoleplayInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // New Episode Form State
+  const [newEpisodeDate, setNewEpisodeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newEpisodeDesc, setNewEpisodeDesc] = useState('');
+  const [newEpisodeImpression, setNewEpisodeImpression] = useState('🤔 普通');
+
+  // Voice Input State
+  const [isListening, setIsListening] = useState(false);
+  const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
+  const [descSentiment, setDescSentiment] = useState<'positive' | 'negative' | 'neutral'>('neutral');
+  const recognitionRef = useRef<any>(null);
+  const currentDescRef = useRef(newEpisodeDesc);
+
+  useEffect(() => {
+    currentDescRef.current = newEpisodeDesc;
+  }, [newEpisodeDesc]);
+
+  const analyzeVoiceSentiment = async (text: string) => {
+    setIsAnalyzingSentiment(true);
+    try {
+      const keys = process.env.GEMINI_API_KEY;
+      if (!keys) return;
+      const ai = new GoogleGenAI({ apiKey: keys });
+      const prompt = `あなたは感情分析AIです。以下のテキストがポジティブかネガティブかニュートラルかを判定し、その1単語（Positive, Negative, Neutral）のみを出力してください。\n\n「${text}」`;
+      const res = await ai.models.generateContent({ model: 'gemini-3.1-flash-preview', contents: prompt });
+      const result = res.text?.toLowerCase() || '';
+      
+      if (result.includes('positive')) {
+        setDescSentiment('positive');
+        setNewEpisodeImpression('😊 良い');
+      } else if (result.includes('negative')) {
+        setDescSentiment('negative');
+        setNewEpisodeImpression('😭 疲れた'); // Or generic negative
+      } else {
+        setDescSentiment('neutral');
+        setNewEpisodeImpression('🤔 普通');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAnalyzingSentiment(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+    } else {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setAlertDialog({ isOpen: true, title: '非対応', message: 'お使いのブラウザは音声入力に対応していません。(ChromeやSafariなどを推奨します)' });
+        return;
+      }
+      
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'ja-JP';
+      
+      // 直前のテキストを保持して、そこに音声認識結果を追記していく
+      const baseText = newEpisodeDesc; 
+      
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        
+        // baseText に finalTranscript を加え、さらに入力途中の interim を表示
+        const updatedText = baseText + (baseText && finalTranscript ? ' ' : '') + finalTranscript + interimTranscript;
+        setNewEpisodeDesc(updatedText);
+      };
+      
+      recognition.onerror = (e: any) => {
+        console.error('Speech recognition error', e);
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+        const text = currentDescRef.current.trim();
+        if (text) {
+          analyzeVoiceSentiment(text);
+        }
+      };
+      
+      recognitionRef.current = recognition;
+      try {
+        recognition.start();
+        setIsListening(true);
+      } catch (e) {
+        console.error(e);
+        setIsListening(false);
+      }
+    }
+  };
+
   // Custom modals state
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false,
@@ -138,6 +248,7 @@ export default function App() {
       id: Math.random().toString(36).substring(2, 9),
       name: '新しい人物',
       relationship: template.relationship,
+      category: template.category,
       expectationLevel: template.expectation,
       traits: template.traits,
       episodes: []
@@ -218,10 +329,11 @@ ${activePerson.episodes.length > 0 ? activePerson.episodes.map(e => `- ${e.descr
       
       const prompt = `あなたは心理学と人間関係の専門家であり、ユーモアのセンスを持った親身なアドバイザーです。
 以下の人物についてのプロフィールと過去の行動エピソードの記録を分析し、
-1. この人物の『行動傾向』
-2. この人物に対して『どの程度の期待値を持つべきか』のガイドライン（ユーザーが精神的に楽になるための、温かくてクスッと笑えるようなアドバイス）
-3. 【重要】ユーザーがすぐに実践できるように、具体的な「会話の返し方（セリフ例）」や「具体的な行動・対処の例」を必ず提示すること。
-を作成してください。
+1. この人物の『今の状態や行動傾向』
+2. この人物への適切な『期待値』とメンタルを保つための心構え
+3. 【最重要】次に会った時に振るべき話題や、関係をより良くする（または適度な距離を保つ）ための具体的なアクション・セリフ例を箇条書きで３つ以上提案
+
+上記をプレーンなテキスト（またはマークダウン）で作成してください。
 冷徹になりすぎず、人間関係で疲れているユーザーの心の負担を減らすトーンでお願いします。不要な前置きは省き、すぐに分析結果から記述してください。出力は必ず自然な日本語で行ってください。
 
 【対象人物の情報】
@@ -573,45 +685,62 @@ ${peopleContext}`;
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
           <button 
             onClick={() => { setIsAddModalOpen(true); setIsMobileMenuOpen(false); }}
-            className="w-full py-3 px-4 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-colors flex items-center justify-center gap-2 font-medium"
+            className="w-full py-4 px-4 rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors flex items-center justify-center gap-2 font-medium"
           >
             <UserPlus size={18} />
             人物を追加
           </button>
-          
-          <div className="space-y-2 mt-4">
-            {people.map(p => (
+
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide text-sm mt-4 mb-2">
+            {['すべて', '仕事', '友人', '家族', 'その他'].map(cat => (
               <button
-                key={p.id}
-                onClick={() => { setSelectedId(p.id); setIsMobileMenuOpen(false); }}
-                className={`w-full text-left p-4 rounded-xl transition-all duration-200 border ${
-                  selectedId === p.id 
-                    ? 'bg-slate-800/80 border-slate-700 shadow-sm' 
-                    : 'bg-transparent border-transparent hover:bg-slate-800/40 hover:border-slate-800/80'
-                }`}
+                key={cat}
+                onClick={() => setCategoryFilter(cat as typeof categoryFilter)}
+                className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors border font-medium ${categoryFilter === cat ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
               >
-                <div className="flex justify-between items-center mb-1.5 gap-2">
-                  <div className="font-medium text-slate-200 truncate">{p.name || '名前なし'}</div>
-                  <div className="flex gap-0.5 shrink-0" title={`期待値: ${p.expectationLevel}`}>
-                    {[1, 2, 3, 4, 5].map(level => (
-                      <div 
-                        key={level} 
-                        className={`w-1 h-2.5 rounded-full transition-colors ${
-                          level <= p.expectationLevel ? 'bg-indigo-400' : 'bg-slate-700/50'
-                        }`} 
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="text-xs text-slate-500 truncate flex items-center gap-2">
-                  <User size={12} className="shrink-0" />
-                  <span className="truncate">{p.relationship || '関係未設定'}</span>
-                </div>
+                {cat}
               </button>
             ))}
+          </div>
+          
+          <div className="space-y-3 mt-4">
+            {people.filter(p => categoryFilter === 'すべて' || p.category === categoryFilter).map(p => {
+              const lastMetInfo = p.episodes.length > 0 
+                  ? new Date(Math.max(...p.episodes.map(e => new Date(e.date).getTime())))
+                  : null;
+              const isOverdue = lastMetInfo && (new Date().getTime() - lastMetInfo.getTime() > 30 * 24 * 60 * 60 * 1000);
+
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setSelectedId(p.id); setIsMobileMenuOpen(false); }}
+                  className={`w-full text-left p-4 rounded-2xl transition-all duration-200 border ${
+                    selectedId === p.id 
+                      ? 'bg-slate-800/80 border-indigo-500/50 shadow-lg shadow-indigo-500/10' 
+                      : 'bg-slate-800/30 border-slate-800 hover:bg-slate-800/60 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-2 gap-2">
+                    <div className={`font-semibold text-base truncate ${isOverdue ? 'text-red-400' : 'text-slate-200'}`}>
+                      {p.name || '名前なし'}
+                    </div>
+                    {isOverdue && (
+                      <span className="text-[10px] font-bold bg-red-500/20 text-red-400 px-2 py-1 rounded-full shrink-0 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce"></span>
+                        1ヶ月連絡なし
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate flex items-center gap-2">
+                    <Tag size={12} className="shrink-0" />
+                    <span className="truncate">{p.category || 'その他'} • {p.relationship || '関係未設定'}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col gap-2 relative z-50">
@@ -905,6 +1034,11 @@ ${peopleContext}`;
                                 </span>
                               </div>
                             )}
+                            {episode.impression && (
+                              <div className="mt-2 text-sm text-slate-300 font-medium">
+                                印象: {episode.impression}
+                              </div>
+                            )}
                           </div>
                           <button 
                             onClick={() => {
@@ -929,75 +1063,108 @@ ${peopleContext}`;
                 </div>
 
                 {/* Add New Episode form */}
-                <div className="shrink-0 pt-4 border-t border-slate-800 mt-2">
+                <div className="shrink-0 pt-6 border-t border-slate-800 mt-2">
                   <form 
                     onSubmit={(e) => {
                       e.preventDefault();
-                      const form = e.currentTarget;
-                      const dateInput = form.elements.namedItem('date') as HTMLInputElement;
-                      const descInput = form.elements.namedItem('desc') as HTMLInputElement;
-                      const energyInput = form.elements.namedItem('energy') as HTMLInputElement;
                       
-                      const date = dateInput.value;
-                      const description = descInput.value.trim();
-                      const energyDelta = parseInt(energyInput.value, 10);
+                      const date = newEpisodeDate;
+                      const description = newEpisodeDesc.trim();
+                      const impression = newEpisodeImpression;
                       
                       if (date && description) {
                         const newEp: Episode = {
                           id: Math.random().toString(36).substring(2, 9),
                           date,
                           description,
-                          energyDelta
+                          impression
                         };
                         updatePerson(activePerson.id, {
                           episodes: [newEp, ...activePerson.episodes]
                         });
-                        descInput.value = '';
-                        energyInput.value = '0';
+                        setNewEpisodeDesc('');
+                        setNewEpisodeImpression('🤔 普通');
+                        setDescSentiment('neutral');
                       }
                     }}
-                    className="flex flex-col gap-3"
+                    className="flex flex-col gap-4"
                   >
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <input 
-                        name="date"
                         type="date" 
                         required
-                        defaultValue={new Date().toISOString().split('T')[0]}
-                        className="bg-slate-800 text-slate-300 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500/50 shrink-0"
+                        value={newEpisodeDate}
+                        onChange={(e) => setNewEpisodeDate(e.target.value)}
+                        className="bg-slate-800 text-slate-300 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 shrink-0"
                       />
+                      <button 
+                        type="button"
+                        onClick={() => setNewEpisodeDate(new Date().toISOString().split('T')[0])}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap"
+                      >
+                        今日
+                      </button>
+                    </div>
+
+                    <div className="relative flex items-center">
                       <input 
-                        name="desc"
                         type="text" 
                         required
+                        value={newEpisodeDesc}
+                        onChange={(e) => {
+                          setNewEpisodeDesc(e.target.value);
+                          if (descSentiment !== 'neutral') setDescSentiment('neutral');
+                        }}
                         placeholder="何がありましたか？客観的な事実を入力..."
-                        className="flex-1 bg-slate-800 text-slate-200 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500/50 placeholder-slate-500"
+                        className={`w-full text-slate-200 border rounded-xl pl-4 pr-12 py-3 text-sm focus:outline-none placeholder-slate-500 transition-colors ${
+                          descSentiment === 'positive'
+                            ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)] focus:border-emerald-400'
+                            : descSentiment === 'negative'
+                              ? 'bg-red-500/10 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.15)] focus:border-red-400'
+                              : 'bg-slate-800 border-slate-700 focus:border-indigo-500'
+                        }`}
                         autoComplete="off"
                       />
+                      <button
+                        type="button"
+                        onClick={toggleListening}
+                        disabled={isAnalyzingSentiment}
+                        className={`absolute right-2 p-2 rounded-xl transition-all duration-300 ${
+                          isListening 
+                            ? 'text-red-400 bg-red-400/10 shadow-[0_0_15px_rgba(248,113,113,0.4)] animate-pulse' 
+                            : isAnalyzingSentiment
+                            ? 'text-indigo-400 bg-indigo-500/10 animate-pulse'
+                            : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-700'
+                        }`}
+                        title={isListening ? '録音停止' : '音声で入力'}
+                      >
+                        {isAnalyzingSentiment ? <Sparkles size={18} className="animate-spin-slow" /> : <Mic size={18} className={isListening ? 'animate-pulse' : ''} />}
+                      </button>
                     </div>
                     
                     <div className="flex flex-col gap-2 mt-1">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-red-400 flex items-center gap-1"><Zap size={12}/> エネルギー奪われた</span>
-                        <span className="text-slate-400 flex items-center gap-1">影響度を記録</span>
-                        <span className="text-emerald-400 flex items-center gap-1"><Battery size={12}/> エネルギー回復/もらった</span>
-                      </div>
-                      <input 
-                        name="energy"
-                        type="range"
-                        min="-5"
-                        max="5"
-                        defaultValue="0"
-                        className="w-full accent-emerald-500"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-500 px-1">
-                        <span>-5</span><span>-4</span><span>-3</span><span>-2</span><span>-1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span><span>+4</span><span>+5</span>
+                      <span className="text-xs text-slate-400 font-medium">相手の印象・温度感</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {['😊 良い', '🤔 普通', '🔥 熱い', '💤 微妙', '😭 疲れた', '😡 怒り'].map(imp => (
+                          <button
+                            key={imp}
+                            type="button"
+                            onClick={() => setNewEpisodeImpression(imp)}
+                            className={`py-2 px-2 text-sm rounded-xl border transition-colors ${
+                              newEpisodeImpression === imp 
+                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' 
+                                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {imp}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
-                    <button type="submit" className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 mt-1">
-                      <Plus size={16} />
-                      ログを記録する
+                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 mt-2 shadow-lg shadow-indigo-500/20 active:scale-95">
+                      <Plus size={18} />
+                      新しく記録する
                     </button>
                   </form>
                 </div>
