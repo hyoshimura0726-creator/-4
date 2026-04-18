@@ -6,7 +6,7 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: '/relationship-keeper/', // ← 新しいリポジトリ名に置き換えてください（例: '/my-repo/'）
+    base: './', // 相対パスに変更して、どのサブディレクトリでもデプロイ可能にする
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
