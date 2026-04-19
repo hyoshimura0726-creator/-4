@@ -36,10 +36,10 @@
   </defs>
 
   <!-- App Icon Background -->
-  <rect x="32" y="32" width="448" height="448" rx="100" fill="url(#bgGrad)" filter="url(#dropShadow)" />
+  <rect x="32" y="32" width="448" height="448" rx="80" fill="url(#bgGrad)" filter="url(#dropShadow)" />
 
   <!-- Heart Container with Subtle Glow -->
-  <g transform="translate(0, 16)" filter="url(#glow)">
+  <g transform="translate(0, 8)" filter="url(#glow)">
     
     <!-- Left Half: Organic (Pink) -->
     <g>

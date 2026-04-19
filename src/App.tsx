@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   UserPlus, Calendar, BrainCircuit, Trash2, X, Plus, 
   Sparkles, Activity, Tag, User, MessageCircleHeart, Send, Menu,
-  Briefcase, Coffee, Home, UserCircle, Download, Upload, PlayCircle, Archive, Battery, Zap, Mic
+  Briefcase, Coffee, Home, UserCircle, Download, Upload, PlayCircle, Archive, Battery, Zap, Mic,
+  Network, IdCard
 } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -664,6 +665,8 @@ ${peopleContext}`;
 
   return (
     <div className="flex h-screen bg-[#020617] text-slate-200 overflow-hidden font-sans relative">
+      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-pink-500/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
       
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
@@ -674,23 +677,24 @@ ${peopleContext}`;
       )}
 
       {/* Sidebar */}
-      <div className={`fixed md:relative inset-y-0 left-0 z-50 w-80 bg-[#0f172a] border-r border-slate-800 flex flex-col items-stretch h-full transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="p-6 pb-4 border-b border-slate-800 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <BrainCircuit className="text-emerald-400 w-6 h-6" />
-            <h1 className="font-semibold text-lg tracking-wide text-slate-100">人間関係<span className="text-slate-400 font-light">記録帳</span></h1>
+      <div className={`fixed md:relative inset-y-0 left-0 z-50 w-80 bg-[#0f172a]/80 backdrop-blur-xl border-r border-slate-800/80 flex flex-col items-stretch h-full transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-6 pb-4 border-b border-slate-800/80 flex items-center justify-between gap-3 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-cyan-500/5 pointer-events-none" />
+          <div className="flex items-center gap-3 relative z-10">
+            <img src="./icon.svg" alt="App Logo" className="w-8 h-8 drop-shadow-[0_0_12px_rgba(236,72,153,0.6)]" />
+            <h1 className="font-semibold text-lg tracking-wide text-slate-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">人間関係<span className="text-slate-400 font-light">記録帳</span></h1>
           </div>
           <button className="md:hidden p-2 -mr-2 text-slate-400" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={20} />
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar relative z-10">
           <button 
             onClick={() => { setIsAddModalOpen(true); setIsMobileMenuOpen(false); }}
-            className="w-full py-4 px-4 rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors flex items-center justify-center gap-2 font-medium"
+            className="w-full py-4 px-4 rounded-xl text-cyan-50 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/40 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all flex items-center justify-center gap-2 font-medium group"
           >
-            <UserPlus size={18} />
+            <UserPlus size={18} className="text-cyan-400 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] transition-all" />
             人物を追加
           </button>
 
@@ -699,7 +703,7 @@ ${peopleContext}`;
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat as typeof categoryFilter)}
-                className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors border font-medium ${categoryFilter === cat ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors border font-medium ${categoryFilter === cat ? 'bg-pink-600/20 border-pink-500/50 text-pink-300 shadow-[0_0_10px_rgba(236,72,153,0.3)]' : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200'}`}
               >
                 {cat}
               </button>
@@ -719,23 +723,24 @@ ${peopleContext}`;
                   onClick={() => { setSelectedId(p.id); setIsMobileMenuOpen(false); }}
                   className={`w-full text-left p-4 rounded-2xl transition-all duration-200 border ${
                     selectedId === p.id 
-                      ? 'bg-slate-800/80 border-indigo-500/50 shadow-lg shadow-indigo-500/10' 
-                      : 'bg-slate-800/30 border-slate-800 hover:bg-slate-800/60 hover:border-slate-700'
+                      ? 'bg-slate-800/80 border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.15)] relative overflow-hidden' 
+                      : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/60 hover:border-cyan-500/30'
                   }`}
                 >
-                  <div className="flex justify-between items-center mb-2 gap-2">
-                    <div className={`font-semibold text-base truncate ${isOverdue ? 'text-red-400' : 'text-slate-200'}`}>
+                  {selectedId === p.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
+                  <div className="flex justify-between items-center mb-2 gap-2 relative z-10">
+                    <div className={`font-semibold text-base truncate ${isOverdue ? 'text-pink-400' : 'text-slate-100'}`}>
                       {p.name || '名前なし'}
                     </div>
                     {isOverdue && (
-                      <span className="text-[10px] font-bold bg-red-500/20 text-red-400 px-2 py-1 rounded-full shrink-0 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce"></span>
+                      <span className="text-[10px] font-bold bg-pink-500/20 border border-pink-500/30 text-pink-300 px-2 py-1 rounded-full shrink-0 flex items-center gap-1 shadow-[0_0_8px_rgba(236,72,153,0.3)]">
+                        <span className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-pulse shadow-[0_0_5px_rgba(236,72,153,0.8)]"></span>
                         1ヶ月連絡なし
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500 truncate flex items-center gap-2">
-                    <Tag size={12} className="shrink-0" />
+                  <div className="text-xs text-slate-400 truncate flex items-center gap-2 relative z-10">
+                    <IdCard size={14} className={selectedId === p.id ? "text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] shrink-0" : "text-slate-500 shrink-0"} />
                     <span className="truncate">{p.category || 'その他'} • {p.relationship || '関係未設定'}</span>
                   </div>
                 </button>
@@ -820,10 +825,10 @@ ${peopleContext}`;
                   <div className="flex flex-col gap-4">
                     <div className="flex justify-between items-center text-sm font-semibold text-slate-400">
                       <span className="flex items-center gap-2">
-                        <Activity size={16} className="text-indigo-400" />
+                        <Activity size={16} className="text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]" />
                         設定中の期待値
                       </span>
-                      <span className="text-slate-300 font-mono text-lg">{activePerson.expectationLevel}</span>
+                      <span className="text-cyan-300 font-mono text-lg drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">{activePerson.expectationLevel}</span>
                     </div>
                     
                     <input
@@ -832,7 +837,7 @@ ${peopleContext}`;
                       max="5"
                       value={activePerson.expectationLevel}
                       onChange={e => updatePerson(activePerson.id, { expectationLevel: parseInt(e.target.value) })}
-                      className="w-full accent-indigo-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                      className="w-full accent-cyan-400 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer shadow-[0_0_10px_rgba(34,211,238,0.2)]"
                     />
                     
                     <div className="flex justify-between text-xs text-slate-500 font-medium px-1">
@@ -872,7 +877,7 @@ ${peopleContext}`;
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
                           key={trait} 
-                          className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
+                          className="bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
                         >
                           {trait}
                           <button 
@@ -996,7 +1001,7 @@ ${peopleContext}`;
                     <button
                       onClick={() => summarizeEpisodes(activePerson.id)}
                       disabled={isAnalyzing}
-                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors border border-emerald-500/20 disabled:opacity-50"
+                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-all border border-cyan-500/30 shadow-[0_0_8px_rgba(34,211,238,0.15)] hover:shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-50"
                       title="古いエピソードをAIに要約してもらい、リストを整理します"
                     >
                       <Archive size={14} />
@@ -1177,23 +1182,23 @@ ${peopleContext}`;
           <div className="flex flex-col items-center justify-center h-full text-slate-500 pb-20 px-6 text-center overflow-y-auto">
             {!newPersonSuggestion ? (
               <>
-                <BrainCircuit size={48} className="mb-4 text-slate-700 opacity-50" />
+                <img src="./icon.svg" alt="App Logo" className="w-16 h-16 mb-4 opacity-70 grayscale contrast-125" />
                 <p className="text-lg mb-2">人物を選択するか、新しく追加してください。</p>
                 <p className="text-sm opacity-60">データはブラウザ内にのみ保存されます。</p>
                 
                 <div className="flex gap-4 mt-6 max-md:flex-col items-center">
                   <button 
                     onClick={() => setIsMobileMenuOpen(true)}
-                    className="md:hidden py-3 px-6 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-2 font-medium w-full justify-center"
+                    className="md:hidden py-3 px-6 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center gap-2 font-medium w-full justify-center shadow-[0_0_10px_rgba(34,211,238,0.1)]"
                   >
                     <Menu size={18} />
                     メニューを開く
                   </button>
                   <button 
                     onClick={() => setIsAddModalOpen(true)}
-                    className="max-md:hidden py-3 px-6 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-2 font-medium hover:bg-emerald-500/20 transition-colors"
+                    className="max-md:hidden py-3 px-6 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/40 flex items-center gap-2 font-medium hover:from-cyan-500/20 hover:to-blue-500/20 transition-all shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] group"
                   >
-                    <UserPlus size={18} />
+                    <UserPlus size={18} className="group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
                     新しく人物を追加
                   </button>
 
@@ -1201,12 +1206,12 @@ ${peopleContext}`;
                     <button
                       onClick={suggestNewPersonTemplate}
                       disabled={isSuggestingNewPerson}
-                      className="py-3 px-6 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center gap-2 font-medium hover:bg-indigo-500/20 transition-colors disabled:opacity-50 max-md:w-full"
+                      className="py-3 px-6 rounded-xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 text-pink-300 border border-pink-500/40 flex items-center justify-center gap-2 font-medium hover:from-pink-500/20 hover:to-purple-500/20 transition-all shadow-[0_0_15px_rgba(236,72,153,0.2)] hover:shadow-[0_0_20px_rgba(236,72,153,0.4)] disabled:opacity-50 max-md:w-full group"
                     >
                       {isSuggestingNewPerson ? (
-                        <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-2 border-pink-400 border-t-transparent rounded-full animate-spin"></div>
                       ) : (
-                        <Sparkles size={18} />
+                        <Network size={18} className="group-hover:drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]" />
                       )}
                       相性の良い人物像を分析
                     </button>
@@ -1214,15 +1219,16 @@ ${peopleContext}`;
                 </div>
               </>
             ) : (
-              <div className="max-w-2xl text-left bg-indigo-950/20 border border-indigo-500/30 p-8 max-md:p-5 rounded-2xl shadow-inner relative w-full mt-10">
+              <div className="max-w-2xl text-left bg-slate-900/40 backdrop-blur-md border border-pink-500/30 p-8 max-md:p-5 rounded-2xl shadow-[0_0_30px_rgba(236,72,153,0.05)] relative w-full mt-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-cyan-500/5 rounded-2xl pointer-events-none" />
                 <button 
                   onClick={() => setNewPersonSuggestion(null)} 
-                  className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+                  className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors z-10"
                 >
                   <X size={20} />
                 </button>
-                <h3 className="flex items-center gap-2 text-indigo-300 font-semibold mb-6 border-b border-indigo-500/20 pb-3 text-lg md:text-xl">
-                  <Sparkles size={20} className="shrink-0" />
+                <h3 className="flex items-center gap-2 text-pink-300 font-semibold mb-6 border-b border-pink-500/20 pb-3 text-lg md:text-xl relative z-10 drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">
+                  <Network size={20} className="shrink-0 text-pink-400" />
                   今のあなたにおすすめの人物像
                 </h3>
                 <div className="markdown-body prose-sm md:prose-base prose-invert text-slate-300">
